@@ -3,6 +3,7 @@ import subprocess
 import os
 import asyncio
 from datetime import datetime
+from fastapi import WebSocket
 from database import Database
 from repositories import ScriptRepository, ExecutionRepository
 from models import Script, Execution
@@ -81,6 +82,13 @@ class ExecutionService:
             executions = repo.get_all(script_id=script_id)
             return [execution.to_dict() for execution in executions]
     
+    def get_script(self, script_id: str) -> Optional[Dict]:
+        """Get a script by ID"""
+        with self.db.session_scope() as session:
+            repo = ScriptRepository(session)
+            script = repo.get_by_id(script_id)
+            return script.to_dict() if script else None
+
     def get_execution(self, execution_id: str) -> Optional[Dict]:
         """Get an execution by ID"""
         with self.db.session_scope() as session:
@@ -118,46 +126,73 @@ class ExecutionService:
                 'failed_executions': repo.count_by_status('failed'),
                 'running_executions': repo.count_by_status('running'),
             }
-    
-    async def execute_script(self, script_id: str, script_name: str, script_content: str):
-        """Execute a script asynchronously"""
+
+    async def _stream_output(self, stream, websocket: WebSocket, execution_id: str, stream_type: str):
+        full_output = ""
+        while True:
+            line = await stream.readline()
+            if not line:
+                break
+            decoded_line = line.decode('utf-8')
+            full_output += decoded_line
+            await websocket.send_json({"type": stream_type, "data": decoded_line, "execution_id": execution_id})
+        return full_output
+
+    async def execute_script_ws(self, websocket: WebSocket, script_id: str, script_name: str, script_content: str):
+        """Execute a script and stream output over a WebSocket"""
         execution_id = self.create_execution(script_id, script_name)
-        
-        # Create temporary script file
+        await websocket.send_json({"type": "execution_id", "data": execution_id})
+
         temp_script = f"/tmp/script_{execution_id}.sh"
-        
+        process = None
+
         try:
             with open(temp_script, 'w') as f:
                 f.write(script_content)
-            
             os.chmod(temp_script, 0o755)
-            
-            # Execute script
+
             process = await asyncio.create_subprocess_shell(
                 f"bash {temp_script}",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            
-            stdout, stderr = await process.communicate()
-            
-            # Update execution record
+
+            stdout_task = asyncio.create_task(self._stream_output(process.stdout, websocket, execution_id, 'stdout'))
+            stderr_task = asyncio.create_task(self._stream_output(process.stderr, websocket, execution_id, 'stderr'))
+
+            await asyncio.gather(stdout_task, stderr_task)
+            await process.wait() # Wait for the process to finish
+
+            full_stdout = stdout_task.result()
+            full_stderr = stderr_task.result()
+
+            status = 'completed' if process.returncode == 0 else 'failed'
             self.update_execution(execution_id, {
-                'status': 'completed' if process.returncode == 0 else 'failed',
-                'output': stdout.decode('utf-8'),
-                'error': stderr.decode('utf-8'),
+                'status': status,
+                'output': full_stdout,
+                'error': full_stderr,
                 'exit_code': process.returncode,
                 'completed_at': datetime.utcnow()
             })
-            
+
+            await websocket.send_json({"type": "status", "data": status, "execution_id": execution_id})
+
         except Exception as e:
+            error_message = f"An error occurred during script execution: {str(e)}"
             self.update_execution(execution_id, {
                 'status': 'failed',
-                'error': str(e),
+                'error': error_message,
                 'completed_at': datetime.utcnow()
             })
-        
+            await websocket.send_json({"type": "error", "data": error_message, "execution_id": execution_id})
+
         finally:
-            # Clean up temp file
+            if process and process.returncode is None:
+                try:
+                    process.terminate()
+                    await process.wait() # Ensure process is terminated
+                except ProcessLookupError:
+                    pass # Process already finished
+
             if os.path.exists(temp_script):
                 os.remove(temp_script)

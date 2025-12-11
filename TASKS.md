@@ -7,5 +7,6 @@ Bugs:
 - [x] Live execute command result not working
 - [x] On frontend in details script click excute it not see running progress and live logs
 - [x] SyntaxError: expected 'except' or 'finally' block file "/Users/ravuthz/Projects/devops/zeploy/backend/main.py", line 190
-- [] Fix the socket not work well when click execute on web it no any action
-- [] Fix AttributeError: 'ExecutionService' object has no attribute 'get_script'
+- [x] Fix the socket not work well when click execute on web it no any action
+- [x] Fix AttributeError: 'ExecutionService' object has no attribute 'get_script'
+- [] Check and fix my deployment with docker on firebase studio

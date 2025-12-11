@@ -1,0 +1,50 @@
+services:
+  backend:
+    build: ./backend
+    container_name: backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://adminz:123123@db:5432/postgres_db
+    depends_on:
+      - db
+    networks:
+      - app-net
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: frontend
+    restart: always
+    ports:
+      - "${PORT:-3000}:80"
+    stdin_open: true
+    tty: true
+    networks:
+      - app-net
+    volumes:
+      - ./frontend:/app
+
+  db:
+    image: postgres:15
+    container_name: postgres
+    restart: always
+    environment:
+      POSTGRES_DB: postgres_db
+      POSTGRES_USER: adminz
+      POSTGRES_PASSWORD: 123123
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - app-net
+
+networks:
+  app-net:
+
+volumes:
+  db-data:

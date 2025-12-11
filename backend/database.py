@@ -23,11 +23,14 @@ class Database:
     def _initialize(self):
         """Initialize database connection"""
         # Database URL from environment or default
+        
         database_url = os.getenv(
             "DATABASE_URL",
             "postgresql://postgres:postgres@localhost:5432/shell_script_manager"
         )
         
+        print('database_url: ', database_url)
+
         self._engine = create_engine(
             database_url,
             pool_pre_ping=True,

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List
@@ -134,22 +134,39 @@ async def delete_script(script_id: str):
 
 
 @app.post("/api/scripts/{script_id}/execute")
-async def execute_script(script_id: str, background_tasks: BackgroundTasks):
-    """Execute a script"""
-    script = script_service.get_script(script_id)
-    if not script:
-        raise HTTPException(status_code=404, detail="Script not found")
-    
-    # Add execution to background tasks
-    background_tasks.add_task(
-        execution_service.execute_script,
-        script_id,
-        script['name'],
-        script['content']
-    )
-    
-    return {"message": "Script execution started", "script_id": script_id}
+async def execute_script(script_id: str):
+    """(DEPRECATED) Execute a script. Use websocket instead."""
+    return {"message": "This endpoint is deprecated. Please use the websocket endpoint /ws/execute/{script_id} to execute scripts."}
 
+
+@app.websocket("/ws/execute/{script_id}")
+async def websocket_execute(websocket: WebSocket, script_id: str):
+    await websocket.accept()
+    script = execution_service.get_script(script_id)
+
+    if not script:
+        await websocket.close(code=1011, reason="Script not found")
+        return
+
+    try:
+        await execution_service.execute_script_ws(
+            websocket,
+            script_id,
+            script['name'],
+            script['content']
+        )
+    except Exception as e:
+        error_message = f"An unexpected error occurred: {str(e)}"
+        try:
+            await websocket.send_json({"type": "error", "data": error_message})
+        except Exception:
+            # If sending fails, just log it or handle it silently
+            print(f"Could not send error message to websocket: {error_message}")
+    finally:
+        try:
+            await websocket.close()
+        except Exception:
+            pass # Websocket might be already closed
 
 # Execution endpoints
 @app.get("/api/executions")

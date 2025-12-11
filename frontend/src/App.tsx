@@ -1,12 +1,13 @@
 // frontend/src/App.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
-import { 
-  Play, Edit2, Trash2, Plus, Terminal, Clock, 
-  CheckCircle, XCircle, Loader, Code, Tag, X, Eye, Save 
+import {
+  Play, Edit2, Trash2, Plus, Clock,
+  CheckCircle, XCircle, Loader, Code, Tag, X, Eye, Save, ArrowLeft
 } from 'lucide-react';
 
-const API_URL = 'http://localhost:8000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws';
 
 interface Script {
   id: string;
@@ -39,16 +40,16 @@ interface Stats {
 }
 
 // StatCard Component
-const StatCard = ({ 
-  title, 
-  value, 
-  icon, 
-  color 
-}: { 
-  title: string; 
-  value: number; 
-  icon: React.ReactNode; 
-  color: string; 
+const StatCard = ({
+  title,
+  value,
+  icon,
+  color
+}: {
+  title: string;
+  value: number;
+  icon: React.ReactNode;
+  color: string;
 }) => {
   const colorClasses: Record<string, string> = {
     blue: 'bg-blue-50 text-blue-600 border-blue-200',
@@ -232,6 +233,84 @@ const Modal = ({
   );
 };
 
+// LiveExecution Component
+const LiveExecution = ({
+  script,
+  onBack
+}: {
+  script: Script | null,
+  onBack: () => void
+}) => {
+  const [log, setLog] = useState<string[]>([]);
+  const [status, setStatus] = useState<'running' | 'completed' | 'failed'>('running');
+  const logContainerRef = useRef<HTMLPreElement>(null);
+
+  useEffect(() => {
+    if (!script) return;
+
+    const ws = new WebSocket(`${WS_URL}/execute/${script.id}`);
+    setLog([`> Starting execution of ${script.name}...`]);
+
+    ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+
+      if (message.type === 'stdout' || message.type === 'stderr') {
+        setLog(prev => [...prev, message.data]);
+      } else if (message.type === 'status') {
+        setStatus(message.data);
+        setLog(prev => [...prev, `> Execution finished with status: ${message.data}`]);
+      } else if (message.type === 'error') {
+        setStatus('failed');
+        setLog(prev => [...prev, `> Error: ${message.data}`]);
+      }
+    };
+
+    ws.onclose = () => {
+      if (status === 'running') {
+        setStatus('failed');
+        setLog(prev => [...prev, '> Connection closed unexpectedly.']);
+      }
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [script]);
+
+  useEffect(() => {
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+    }
+  }, [log]);
+
+  return (
+    <div className="bg-white rounded-sm shadow-sm border">
+      <div className="p-6 border-b flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={onBack}
+            className="flex items-center gap-2 px-4 py-2 border rounded-sm hover:bg-gray-100 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            Back
+          </button>
+          <h2 className="text-xl font-semibold text-gray-900">Executing: {script?.name}</h2>
+        </div>
+        <div>
+          {status === 'running' && <span className="text-yellow-600 font-semibold">Running...</span>}
+          {status === 'completed' && <span className="text-green-600 font-semibold">Completed</span>}
+          {status === 'failed' && <span className="text-red-600 font-semibold">Failed</span>}
+        </div>
+      </div>
+      <div className="p-6 bg-gray-900">
+        <pre ref={logContainerRef} className="text-white text-sm font-mono h-96 overflow-y-auto">
+          {log.join('\n')}
+        </pre>
+      </div>
+    </div>
+  );
+}
+
 // Main App Component
 function App() {
   const [scripts, setScripts] = useState<Script[]>([]);
@@ -241,6 +320,7 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isExecutionModalOpen, setIsExecutionModalOpen] = useState(false);
   const [selectedExecution, setSelectedExecution] = useState<Execution | null>(null);
+  const [isExecuting, setIsExecuting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -298,7 +378,7 @@ function App() {
           .filter((t) => t),
       };
 
-      if (selectedScript) {
+      if (selectedScript && !isExecuting) {
         await axios.put(`${API_URL}/scripts/${selectedScript.id}`, data);
       } else {
         await axios.post(`${API_URL}/scripts`, data);
@@ -323,16 +403,16 @@ function App() {
     }
   };
 
-  const handleExecute = async (script: Script) => {
-    try {
-      await axios.post(`${API_URL}/scripts/${script.id}/execute`);
-      alert('Script execution started!');
-      setTimeout(loadData, 1000);
-    } catch (error) {
-      console.error('Error executing script:', error);
-      alert('Error executing script. Please try again.');
-    }
+  const handleExecute = (script: Script) => {
+    setSelectedScript(script);
+    setIsExecuting(true);
   };
+
+  const handleBackFromExecution = () => {
+    setIsExecuting(false);
+    setSelectedScript(null);
+    loadData(); // Refresh data after execution
+  }
 
   const viewExecution = (execution: Execution) => {
     setSelectedExecution(execution);
@@ -341,91 +421,97 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      
+
       <main className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
-        {stats && (
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-            <StatCard title="Total Scripts" value={stats.total_scripts} icon={<Code className="w-6 h-6" />} color="blue" />
-            <StatCard title="Total Runs" value={stats.total_executions} icon={<Clock className="w-6 h-6" />} color="gray" />
-            <StatCard title="Successful" value={stats.successful_executions} icon={<CheckCircle className="w-6 h-6" />} color="green" />
-            <StatCard title="Failed" value={stats.failed_executions} icon={<XCircle className="w-6 h-6" />} color="red" />
-            <StatCard title="Running" value={stats.running_executions} icon={<Loader className="w-6 h-6" />} color="yellow" />
-          </div>
+        {isExecuting ? (
+          <LiveExecution script={selectedScript} onBack={handleBackFromExecution} />
+        ) : (
+          <>
+            {/* Stats Cards */}
+            {stats && (
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+                <StatCard title="Total Scripts" value={stats.total_scripts} icon={<Code className="w-6 h-6" />} color="blue" />
+                <StatCard title="Total Runs" value={stats.total_executions} icon={<Clock className="w-6 h-6" />} color="gray" />
+                <StatCard title="Successful" value={stats.successful_executions} icon={<CheckCircle className="w-6 h-6" />} color="green" />
+                <StatCard title="Failed" value={stats.failed_executions} icon={<XCircle className="w-6 h-6" />} color="red" />
+                <StatCard title="Running" value={stats.running_executions} icon={<Loader className="w-6 h-6" />} color="yellow" />
+              </div>
+            )}
+
+            {/* Scripts Section */}
+            <div className="bg-white rounded-sm shadow-sm border mb-8">
+              <div className="p-6 border-b flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">Scripts</h2>
+                <button
+                  onClick={handleCreate}
+                  className="flex items-center gap-1 px-4 py-2 bg-blue-500 text-white rounded-sm hover:bg-blue-700 transition-colors"
+                >
+                  <Plus className="w-5 h-5" />
+                  Script
+                </button>
+              </div>
+              <div className="p-6">
+                {scripts.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Code className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">No scripts yet. Create your first script!</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {scripts.map((script) => (
+                      <ScriptCard
+                        key={script.id}
+                        script={script}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        onExecute={handleExecute}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Executions Section */}
+            <div className="bg-white rounded-sm shadow-sm border">
+              <div className="p-6 border-b">
+                <h2 className="text-xl font-semibold text-gray-900">Recent Executions</h2>
+              </div>
+              <div className="overflow-x-auto">
+                {executions.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Clock className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                    <p className="text-gray-500">No executions yet. Run a script to see results!</p>
+                  </div>
+                ) : (
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Script</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Started</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {executions.slice(0, 10).map((execution) => (
+                        <ExecutionRow key={execution.id} execution={execution} onView={viewExecution} />
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </div>
+          </>
         )}
-
-        {/* Scripts Section */}
-        <div className="bg-white rounded-sm shadow-sm border mb-8">
-          <div className="p-6 border-b flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-900">Scripts</h2>
-            <button
-              onClick={handleCreate}
-              className="flex items-center gap-1 px-4 py-2 bg-blue-500 text-white rounded-sm hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              Script
-            </button>
-          </div>
-          <div className="p-6">
-            {scripts.length === 0 ? (
-              <div className="text-center py-12">
-                <Code className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">No scripts yet. Create your first script!</p>
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {scripts.map((script) => (
-                  <ScriptCard
-                    key={script.id}
-                    script={script}
-                    onEdit={handleEdit}
-                    onDelete={handleDelete}
-                    onExecute={handleExecute}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Executions Section */}
-        <div className="bg-white rounded-sm shadow-sm border">
-          <div className="p-6 border-b">
-            <h2 className="text-xl font-semibold text-gray-900">Recent Executions</h2>
-          </div>
-          <div className="overflow-x-auto">
-            {executions.length === 0 ? (
-              <div className="text-center py-12">
-                <Clock className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">No executions yet. Run a script to see results!</p>
-              </div>
-            ) : (
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Script</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Started</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {executions.slice(0, 10).map((execution) => (
-                    <ExecutionRow key={execution.id} execution={execution} onView={viewExecution} />
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
       </main>
 
       {/* Script Modal */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={selectedScript ? 'Edit Script' : 'Create New Script'}
+        title={selectedScript && !isExecuting ? 'Edit Script' : 'Create New Script'}
       >
         <div className="space-y-4">
           <div>
@@ -478,7 +564,7 @@ function App() {
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-sm hover:bg-blue-700 transition-colors"
             >
               <Save className="w-5 h-5" />
-              {selectedScript ? 'Update Script' : 'Create Script'}
+              {selectedScript && !isExecuting ? 'Update Script' : 'Create Script'}
             </button>
             <button
               onClick={() => setIsModalOpen(false)}
