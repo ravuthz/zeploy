@@ -1,4 +1,10 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    BackgroundTasks,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List
@@ -12,7 +18,7 @@ load_dotenv()
 app = FastAPI(
     title="Shell Script Manager API",
     description="REST API for managing and executing shell scripts",
-    version="2.0.0"
+    version="2.0.0",
 )
 
 # CORS middleware
@@ -27,6 +33,7 @@ app.add_middleware(
 # Initialize database
 db = Database()
 
+
 # Pydantic models for request/response
 class ScriptCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
@@ -34,11 +41,13 @@ class ScriptCreate(BaseModel):
     content: str = Field(..., min_length=1)
     tags: List[str] = []
 
+
 class ScriptUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = None
     content: Optional[str] = Field(None, min_length=1)
     tags: Optional[List[str]] = None
+
 
 class ScriptResponse(BaseModel):
     id: str
@@ -48,6 +57,7 @@ class ScriptResponse(BaseModel):
     tags: List[str]
     created_at: str
     updated_at: str
+
 
 class ExecutionResponse(BaseModel):
     id: str
@@ -59,6 +69,7 @@ class ExecutionResponse(BaseModel):
     started_at: str
     completed_at: Optional[str]
     exit_code: Optional[int]
+
 
 # Initialize services
 script_service = ScriptService()
@@ -77,7 +88,7 @@ async def root():
     return {
         "message": "Shell Script Manager API v2.0",
         "docs": "/docs",
-        "database": "PostgreSQL"
+        "database": "PostgreSQL",
     }
 
 
@@ -115,10 +126,10 @@ async def update_script(script_id: str, script: ScriptUpdate):
         # Only include fields that are not None
         update_data = {k: v for k, v in script.dict().items() if v is not None}
         updated_script = script_service.update_script(script_id, update_data)
-        
+
         if not updated_script:
             raise HTTPException(status_code=404, detail="Script not found")
-        
+
         return updated_script
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -136,7 +147,9 @@ async def delete_script(script_id: str):
 @app.post("/api/scripts/{script_id}/execute")
 async def execute_script(script_id: str):
     """(DEPRECATED) Execute a script. Use websocket instead."""
-    return {"message": "This endpoint is deprecated. Please use the websocket endpoint /ws/execute/{script_id} to execute scripts."}
+    return {
+        "message": "This endpoint is deprecated. Please use the websocket endpoint /ws/execute/{script_id} to execute scripts."
+    }
 
 
 @app.websocket("/ws/execute/{script_id}")
@@ -150,10 +163,7 @@ async def websocket_execute(websocket: WebSocket, script_id: str):
 
     try:
         await execution_service.execute_script_ws(
-            websocket,
-            script_id,
-            script['name'],
-            script['content']
+            websocket, script_id, script["name"], script["content"]
         )
     except Exception as e:
         error_message = f"An unexpected error occurred: {str(e)}"
@@ -166,7 +176,8 @@ async def websocket_execute(websocket: WebSocket, script_id: str):
         try:
             await websocket.close()
         except Exception:
-            pass # Websocket might be already closed
+            pass  # Websocket might be already closed
+
 
 # Execution endpoints
 @app.get("/api/executions")
@@ -191,8 +202,5 @@ async def get_stats():
     """Get dashboard statistics"""
     exec_stats = execution_service.get_stats()
     script_count = script_service.get_script_count()
-    
-    return {
-        "total_scripts": script_count,
-        **exec_stats
-    }
+
+    return {"total_scripts": script_count, **exec_stats}

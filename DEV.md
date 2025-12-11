@@ -15,7 +15,6 @@ source venv/bin/activate
 pip install fastapi uvicorn pydantic
 pip install sqlalchemy psycopg2-binary
 pip install python-dotenv
-pip install websockets
 
 # Run server
 uvicorn main:app --reload --port 8000

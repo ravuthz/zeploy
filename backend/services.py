@@ -133,7 +133,10 @@ class ExecutionService:
             line = await stream.readline()
             if not line:
                 break
-            decoded_line = line.decode('utf-8')
+            try:
+                decoded_line = line.decode('utf-8')
+            except UnicodeDecodeError:
+                decoded_line = line.decode('utf-8', errors='replace')
             full_output += decoded_line
             await websocket.send_json({"type": stream_type, "data": decoded_line, "execution_id": execution_id})
         return full_output

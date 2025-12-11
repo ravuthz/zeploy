@@ -7,6 +7,7 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    bash \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy only requirements first for caching
