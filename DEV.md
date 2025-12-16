@@ -38,6 +38,8 @@ git init && git add . && git commit -m "Init vite, react-ts template using bun"
 # Install dependencies
 bun add axios lucide-react
 bun add dotenv
+bun add react-syntax-highlighter
+bun add --dev @types/react-syntax-highlighter
 
 # Run dev server
 bun dev

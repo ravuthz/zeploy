@@ -154,12 +154,17 @@ async def execute_script(script_id: str):
 
 @app.websocket("/ws/execute/{script_id}")
 async def websocket_execute(websocket: WebSocket, script_id: str):
-    await websocket.accept()
     script = execution_service.get_script(script_id)
 
     if not script:
         await websocket.close(code=1011, reason="Script not found")
         return
+
+    if script_id in execution_service.active_executions:
+        await websocket.close(code=1008, reason="Execution already in progress for this script")
+        return
+
+    await websocket.accept()
 
     try:
         await execution_service.execute_script_ws(
