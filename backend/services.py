@@ -136,9 +136,9 @@ class ExecutionService:
             repo = ExecutionRepository(session)
             return {
                 "total_executions": repo.count_total(),
-                "successful_executions": repo.count_by_status("completed"),
                 "failed_executions": repo.count_by_status("failed"),
                 "running_executions": repo.count_by_status("running"),
+                "successful_executions": repo.count_by_status("completed"),
             }
 
     async def _stream_output(
@@ -191,7 +191,18 @@ class ExecutionService:
             del self.active_executions[script_id]
 
         execution_id = self.create_execution(script_id, script_name)
-        await websocket.send_json({"type": "execute", "data": execution_id, "command": script_content})
+        # await websocket.send_json(
+        #     {"type": "execute", "data": execution_id, "command": script_content}
+        # )
+
+        # Send command execution message
+        await websocket.send_json(
+            {
+                "type": "stdout",
+                # "data": f"Executing script: {script_name}\n",
+                "execution_id": execution_id,
+            }
+        )
 
         temp_script = f"/tmp/script_{execution_id}.sh"
         process = None
@@ -201,10 +212,18 @@ class ExecutionService:
                 f.write(script_content)
             os.chmod(temp_script, 0o755)
 
+            # PS4='[DEBUG:${LINENO}] set -x
+            # stdbuf -oL -eL sh deploy.sh
+
             process = await asyncio.create_subprocess_shell(
-                f"bash {temp_script}",
+                f"stdbuf -oL -eL sh -x {temp_script}",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                env={
+                    **os.environ,
+                    "PS4": "\$ ",
+                    # "PS4": " \n[CMD:${LINENO}] ",
+                },
             )
 
             # Store active execution

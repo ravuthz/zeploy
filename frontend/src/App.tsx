@@ -117,9 +117,6 @@ const ScriptCard = ({
 							</span>
 						))}
 					</div>
-					{/* <p className="text-xs text-gray-500">
-            Updated: {new Date(script.updated_at).toLocaleString()}
-          </p> */}
 				</div>
 				<div className="flex items-center gap-2 ml-4">
 					<button
@@ -272,8 +269,6 @@ const LiveExecution = ({
 		url: `${WS_URL}/execute/${script?.id}`,
 	});
 
-	console.log(output);
-
 	useEffect(() => {
 		if (connected && message) {
 			console.log({
@@ -290,7 +285,7 @@ const LiveExecution = ({
 	// }, [log]);
 
 	return (
-		<div className="bg-white rounded-sm shadow-sm border">
+		<div className="bg-white rounded-sm shadow-sm border h-full">
 			<div className="p-6 border-b flex items-center justify-between">
 				<div className="flex items-center gap-4">
 					<button
@@ -317,9 +312,13 @@ const LiveExecution = ({
 					)}
 				</div>
 			</div>
-			<SyntaxHighlighter language="bash" style={atomDark}>
-				{output.join("\n")}
-			</SyntaxHighlighter>
+
+			<div className="max-h-[450px] overflow-y-auto">
+				<SyntaxHighlighter language="bash" style={atomDark} className="min-h-[450px]">
+					{output.join("\n")}
+				</SyntaxHighlighter>
+			</div>
+
 			{/* <div className="p-6 bg-gray-900">
 				<pre
 					ref={logContainerRef}

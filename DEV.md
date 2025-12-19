@@ -49,6 +49,16 @@ bun dev
 # axios lucide-react @radix-ui/react-dialog @radix-ui/react-select
 ```
 
+```python
+
+process = await asyncio.create_subprocess_shell(
+    f"stdbuf -oL -eL bash {temp_script}",
+    stdout=asyncio.subprocess.PIPE,
+    stderr=asyncio.subprocess.PIPE,
+)
+
+```
+
 - Backend: http://localhost:8000
 - Frontend: http://localhost:5173
 - API Docs: http://localhost:8000/docs

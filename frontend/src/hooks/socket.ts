@@ -38,19 +38,26 @@ export const useSocket = ({ url }: { url: string }) => {
 			addLog(`Websocket message: ${text}`);
 
 			switch (message.type) {
-				case "execute":
-					setOutput((prev) => [...prev, `${message.command} \n`]);
-					break;
+				// case "execute":
+				// 	setOutput((prev) => [...prev, `${message.command} \n`]);
+				// 	break;
 
 				case "stdout":
-				case "stderr":
-					setOutput((prev) => [...prev, `${message.data}`]);
+				case "stderr": {
+					const lines = message.data.split("\n")
+						.filter((line: string) => line.trim())
+						.map((line: string) => {
+							return line.startsWith('$') ? `\n${line}\n` : line;
+						});
+
+					setOutput((prev) => [...prev, ...lines]);
 					break;
+				}
 
 				case "status":
 					setOutput((prev) => [
 						...prev,
-						`Execution finished with status: ${message.data}`,
+						`\nExecution finished with status: ${message.data}`,
 					]);
 					setStatus(message.data);
 					break;

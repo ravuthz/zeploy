@@ -161,12 +161,16 @@ async def websocket_execute(websocket: WebSocket, script_id: str):
         return
 
     if script_id in execution_service.active_executions:
-        await websocket.close(code=1008, reason="Execution already in progress for this script")
+        await websocket.close(
+            code=1008, reason="Execution already in progress for this script"
+        )
         return
 
     await websocket.accept()
 
     try:
+        # split command by lines
+        # then execute 1 by 1
         await execution_service.execute_script_ws(
             websocket, script_id, script["name"], script["content"]
         )
