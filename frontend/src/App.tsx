@@ -443,138 +443,137 @@ function App() {
 
 	return (
 		<div className="min-h-screen bg-gray-50">
-			<main className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-				{isExecuting ? (
-					<LiveExecution
-						script={selectedScript}
-						onBack={handleBackFromExecution}
-					/>
-				) : (
-					<>
-						{/* Stats Cards */}
-						{stats && (
-							<div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-								<StatCard
-									title="Total Scripts"
-									value={stats.total_scripts}
-									icon={<Code className="w-6 h-6" />}
-									color="blue"
-								/>
-								<StatCard
-									title="Total Runs"
-									value={stats.total_executions}
-									icon={<Clock className="w-6 h-6" />}
-									color="gray"
-								/>
-								<StatCard
-									title="Successful"
-									value={stats.successful_executions}
-									icon={<CheckCircle className="w-6 h-6" />}
-									color="green"
-								/>
-								<StatCard
-									title="Failed"
-									value={stats.failed_executions}
-									icon={<XCircle className="w-6 h-6" />}
-									color="red"
-								/>
-								<StatCard
-									title="Running"
-									value={stats.running_executions}
-									icon={<Loader className="w-6 h-6" />}
-									color="yellow"
-								/>
-							</div>
-						)}
+			<main className="max-w-9xl mx-auto px-4 sm:px-6 lg:px-8 pt-[94px] pb-8">				{isExecuting ? (
+				<LiveExecution
+					script={selectedScript}
+					onBack={handleBackFromExecution}
+				/>
+			) : (
+				<>
+					{/* Stats Cards */}
+					{stats && (
+						<div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+							<StatCard
+								title="Total Scripts"
+								value={stats.total_scripts}
+								icon={<Code className="w-6 h-6" />}
+								color="blue"
+							/>
+							<StatCard
+								title="Total Runs"
+								value={stats.total_executions}
+								icon={<Clock className="w-6 h-6" />}
+								color="gray"
+							/>
+							<StatCard
+								title="Successful"
+								value={stats.successful_executions}
+								icon={<CheckCircle className="w-6 h-6" />}
+								color="green"
+							/>
+							<StatCard
+								title="Failed"
+								value={stats.failed_executions}
+								icon={<XCircle className="w-6 h-6" />}
+								color="red"
+							/>
+							<StatCard
+								title="Running"
+								value={stats.running_executions}
+								icon={<Loader className="w-6 h-6" />}
+								color="yellow"
+							/>
+						</div>
+					)}
 
-						{/* Scripts Section */}
-						<div className="bg-white rounded-sm shadow-sm border mb-8">
-							<div className="p-6 border-b flex items-center justify-between">
-								<h2 className="text-xl font-semibold text-gray-900">Scripts</h2>
-								<button
-									type="button"
-									onClick={handleCreate}
-									className="flex items-center gap-1 px-4 py-2 bg-blue-500 text-white rounded-sm hover:bg-blue-700 transition-colors"
-								>
-									<Plus className="w-5 h-5" />
-									Script
-								</button>
-							</div>
-							<div className="p-6">
-								{scripts.length === 0 ? (
-									<div className="text-center py-12">
-										<Code className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-										<p className="text-gray-500">
-											No scripts yet. Create your first script!
-										</p>
-									</div>
-								) : (
-									<div className="grid gap-4">
-										{scripts.map((script) => (
-											<ScriptCard
-												key={script.id}
-												script={script}
-												onEdit={handleEdit}
-												onDelete={handleDelete}
-												onExecute={handleExecute}
+					{/* Scripts Section */}
+					<div className="bg-white rounded-sm shadow-sm border mb-8">
+						<div className="p-6 border-b flex items-center justify-between">
+							<h2 className="text-xl font-semibold text-gray-900">Scripts</h2>
+							<button
+								type="button"
+								onClick={handleCreate}
+								className="flex items-center gap-1 px-4 py-2 bg-blue-500 text-white rounded-sm hover:bg-blue-700 transition-colors"
+							>
+								<Plus className="w-5 h-5" />
+								Script
+							</button>
+						</div>
+						<div className="p-6">
+							{scripts.length === 0 ? (
+								<div className="text-center py-12">
+									<Code className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+									<p className="text-gray-500">
+										No scripts yet. Create your first script!
+									</p>
+								</div>
+							) : (
+								<div className="grid gap-4">
+									{scripts.map((script) => (
+										<ScriptCard
+											key={script.id}
+											script={script}
+											onEdit={handleEdit}
+											onDelete={handleDelete}
+											onExecute={handleExecute}
+										/>
+									))}
+								</div>
+							)}
+						</div>
+					</div>
+
+					{/* Executions Section */}
+					<div className="bg-white rounded-sm shadow-sm border">
+						<div className="p-6 border-b">
+							<h2 className="text-xl font-semibold text-gray-900">
+								Recent Executions
+							</h2>
+						</div>
+						<div className="overflow-x-auto">
+							{executions.length === 0 ? (
+								<div className="text-center py-12">
+									<Clock className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+									<p className="text-gray-500">
+										No executions yet. Run a script to see results!
+									</p>
+								</div>
+							) : (
+								<table className="w-full">
+									<thead className="bg-gray-50">
+										<tr>
+											<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+												Script
+											</th>
+											<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+												Status
+											</th>
+											<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+												Started
+											</th>
+											<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+												Duration
+											</th>
+											<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+												Actions
+											</th>
+										</tr>
+									</thead>
+									<tbody className="bg-white divide-y divide-gray-200">
+										{executions.slice(0, 10).map((execution) => (
+											<ExecutionRow
+												key={execution.id}
+												execution={execution}
+												onView={viewExecution}
 											/>
 										))}
-									</div>
-								)}
-							</div>
+									</tbody>
+								</table>
+							)}
 						</div>
-
-						{/* Executions Section */}
-						<div className="bg-white rounded-sm shadow-sm border">
-							<div className="p-6 border-b">
-								<h2 className="text-xl font-semibold text-gray-900">
-									Recent Executions
-								</h2>
-							</div>
-							<div className="overflow-x-auto">
-								{executions.length === 0 ? (
-									<div className="text-center py-12">
-										<Clock className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-										<p className="text-gray-500">
-											No executions yet. Run a script to see results!
-										</p>
-									</div>
-								) : (
-									<table className="w-full">
-										<thead className="bg-gray-50">
-											<tr>
-												<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-													Script
-												</th>
-												<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-													Status
-												</th>
-												<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-													Started
-												</th>
-												<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-													Duration
-												</th>
-												<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-													Actions
-												</th>
-											</tr>
-										</thead>
-										<tbody className="bg-white divide-y divide-gray-200">
-											{executions.slice(0, 10).map((execution) => (
-												<ExecutionRow
-													key={execution.id}
-													execution={execution}
-													onView={viewExecution}
-												/>
-											))}
-										</tbody>
-									</table>
-								)}
-							</div>
-						</div>
-					</>
-				)}
+					</div>
+				</>
+			)}
 			</main>
 
 			{/* Script Modal */}
