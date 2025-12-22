@@ -97,7 +97,7 @@ async def root():
 async def get_scripts(tag: Optional[str] = None, search: Optional[str] = None):
     """Get all scripts with optional filtering"""
     scripts = script_service.get_all_scripts(tag=tag, search=search)
-    return {"scripts": scripts, "total": len(scripts)}
+    return {"items": scripts, "total": len(scripts)}
 
 
 @app.get("/api/scripts/{script_id}", response_model=ScriptResponse)
@@ -193,7 +193,7 @@ async def websocket_execute(websocket: WebSocket, script_id: str):
 async def get_executions(script_id: Optional[str] = None):
     """Get execution history"""
     executions = execution_service.get_all_executions(script_id=script_id)
-    return {"executions": executions, "total": len(executions)}
+    return {"items": executions, "total": len(executions)}
 
 
 @app.get("/api/executions/{execution_id}", response_model=ExecutionResponse)
@@ -212,4 +212,4 @@ async def get_stats():
     exec_stats = execution_service.get_stats()
     script_count = script_service.get_script_count()
 
-    return {"total_scripts": script_count, **exec_stats}
+    return {"items": {"total_scripts": script_count, **exec_stats}}

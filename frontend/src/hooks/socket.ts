@@ -44,13 +44,7 @@ export const useSocket = ({ url }: { url: string }) => {
 
 				case "stdout":
 				case "stderr": {
-					const lines = message.data.split("\n")
-						.filter((line: string) => line.trim())
-						.map((line: string) => {
-							return line.startsWith('$') ? `\n${line}\n` : line;
-						});
-
-					setOutput((prev) => [...prev, ...lines]);
+					setOutput((prev) => [...prev, message.data]);
 					break;
 				}
 

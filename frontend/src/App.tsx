@@ -1,4 +1,3 @@
-import axios from "axios";
 import {
 	ArrowLeft,
 	CheckCircle,
@@ -9,51 +8,20 @@ import {
 	Loader,
 	Play,
 	Plus,
-	Save,
 	Tag,
 	Trash2,
-	X,
 	XCircle,
 } from "lucide-react";
-import { type MouseEventHandler, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 
-import { atomDark, dark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { atomDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 import { useSocket } from "./hooks/socket";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api";
-const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8000/ws";
-
-interface Script {
-	id: string;
-	name: string;
-	description: string;
-	content: string;
-	tags: string[];
-	created_at: string;
-	updated_at: string;
-}
-
-interface Execution {
-	id: string;
-	script_id: string;
-	script_name: string;
-	status: "running" | "completed" | "failed";
-	output: string;
-	error: string;
-	started_at: string;
-	completed_at?: string;
-	exit_code?: number;
-}
-
-interface Stats {
-	total_scripts: number;
-	total_executions: number;
-	successful_executions: number;
-	failed_executions: number;
-	running_executions: number;
-}
+import type { Execution, Script, Stats } from "./types";
+import ScriptModal from "./components/ScriptModal";
+import DetailModal from "./components/DetailModal";
+import { apiStats, apiScript, apiExecution, wsExecute, } from "./api";
 
 // StatCard Component
 const StatCard = ({
@@ -104,7 +72,7 @@ const ScriptCard = ({
 		<div className="border rounded-sm p-4 hover:shadow-md transition-shadow">
 			<div className="flex items-start justify-between">
 				<div className="flex-1">
-					<h3 className="text-lg font-semibold text-gray-900">{script.name}</h3>
+					<h3 className="text-sm font-semibold text-gray-900">{script.name}</h3>
 					{/* <p className="text-sm text-gray-600 mt-1">{script.description}</p> */}
 					<div className="flex items-center gap-2 mt-3">
 						{script.tags.map((tag) => (
@@ -220,41 +188,6 @@ const ExecutionRow = ({
 	);
 };
 
-// Modal Component
-const Modal = ({
-	isOpen,
-	onClose,
-	title,
-	children,
-}: {
-	isOpen: boolean;
-	onClose: () => void;
-	title: string;
-	children: React.ReactNode;
-}) => {
-	if (!isOpen) return null;
-
-	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-			<div className="bg-white rounded-sm shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
-				<div className="flex items-center justify-between p-6 border-b">
-					<h2 className="text-xl font-semibold text-gray-900">{title}</h2>
-					<button
-						type="button"
-						onClick={onClose}
-						className="p-2 hover:bg-gray-100 rounded-sm transition-colors"
-					>
-						<X className="w-5 h-5" />
-					</button>
-				</div>
-				<div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
-					{children}
-				</div>
-			</div>
-		</div>
-	);
-};
-
 // LiveExecution Component
 const LiveExecution = ({
 	script,
@@ -263,10 +196,10 @@ const LiveExecution = ({
 	script: Script | null;
 	onBack: () => void;
 }) => {
-	const logContainerRef = useRef<HTMLPreElement>(null);
+	// const logContainerRef = useRef<HTMLPreElement>(null);
 
 	const { connected, status, message, output } = useSocket({
-		url: `${WS_URL}/execute/${script?.id}`,
+		url: `${wsExecute}/${script?.id}`,
 	});
 
 	useEffect(() => {
@@ -315,27 +248,18 @@ const LiveExecution = ({
 
 			<div className="max-h-[450px] overflow-y-auto">
 				<SyntaxHighlighter language="bash" style={atomDark} className="min-h-[450px]">
-					{output.join("\n")}
+					{output.join("")}
 				</SyntaxHighlighter>
 			</div>
-
-			{/* <div className="p-6 bg-gray-900">
-				<pre
-					ref={logContainerRef}
-					className="text-white text-sm font-mono h-96 overflow-y-auto"
-				>
-					{output.join("\n")}
-				</pre>
-			</div> */}
 		</div>
 	);
 };
 
 // Main App Component
 function App() {
+	const [stats, setStats] = useState<Stats | null>(null);
 	const [scripts, setScripts] = useState<Script[]>([]);
 	const [executions, setExecutions] = useState<Execution[]>([]);
-	const [stats, setStats] = useState<Stats | null>(null);
 	const [selectedScript, setSelectedScript] = useState<Script | null>(null);
 	const [isModalOpen, setIsModalOpen] = useState(false);
 	const [isExecutionModalOpen, setIsExecutionModalOpen] = useState(false);
@@ -343,23 +267,17 @@ function App() {
 		null,
 	);
 	const [isExecuting, setIsExecuting] = useState(false);
-	const [formData, setFormData] = useState({
-		name: "",
-		description: "",
-		content: "",
-		tags: "",
-	});
 
 	const loadData = async () => {
 		try {
-			const [scriptsRes, executionsRes, statsRes] = await Promise.all([
-				axios.get(`${API_URL}/scripts`),
-				axios.get(`${API_URL}/executions`),
-				axios.get(`${API_URL}/stats`),
+			const [statsRes, scriptsRes, executionsRes] = await Promise.all([
+				apiStats.list(),
+				apiScript.list(),
+				apiExecution.list(),
 			]);
-			setScripts(scriptsRes.data.scripts);
-			setExecutions(executionsRes.data.executions);
-			setStats(statsRes.data);
+			setStats(statsRes.data.items);
+			setScripts(scriptsRes.data.items);
+			setExecutions(executionsRes.data.items);
 		} catch (error) {
 			console.error("Error loading data:", error);
 		}
@@ -373,51 +291,18 @@ function App() {
 
 	const handleCreate = () => {
 		setSelectedScript(null);
-		setFormData({ name: "", description: "", content: "", tags: "" });
 		setIsModalOpen(true);
 	};
 
 	const handleEdit = (script: Script) => {
 		setSelectedScript(script);
-		setFormData({
-			name: script.name,
-			description: script.description,
-			content: script.content,
-			tags: script.tags.join(", "),
-		});
 		setIsModalOpen(true);
-	};
-
-	const handleSubmit = async () => {
-		try {
-			const data = {
-				name: formData.name,
-				description: formData.description,
-				content: formData.content,
-				tags: formData.tags
-					.split(",")
-					.map((t) => t.trim())
-					.filter((t) => t),
-			};
-
-			if (selectedScript && !isExecuting) {
-				await axios.put(`${API_URL}/scripts/${selectedScript.id}`, data);
-			} else {
-				await axios.post(`${API_URL}/scripts`, data);
-			}
-
-			setIsModalOpen(false);
-			loadData();
-		} catch (error) {
-			console.error("Error saving script:", error);
-			alert("Error saving script. Please try again.");
-		}
 	};
 
 	const handleDelete = async (id: string) => {
 		if (confirm("Are you sure you want to delete this script?")) {
 			try {
-				await axios.delete(`${API_URL}/scripts/${id}`);
+				await apiScript.delete(id);
 				loadData();
 			} catch (error) {
 				console.error("Error deleting script:", error);
@@ -576,166 +461,21 @@ function App() {
 			)}
 			</main>
 
-			{/* Script Modal */}
-			<Modal
+			<ScriptModal
+				data={selectedScript}
 				isOpen={isModalOpen}
 				onClose={() => setIsModalOpen(false)}
-				title={
-					selectedScript && !isExecuting ? "Edit Script" : "Create New Script"
-				}
-			>
-				<div className="space-y-4">
-					<div>
-						<label
-							htmlFor="name"
-							className="block text-sm font-medium text-gray-700 mb-2"
-						>
-							Script Name
-						</label>
-						<input
-							name="name"
-							type="text"
-							value={formData.name}
-							onChange={(e) =>
-								setFormData({ ...formData, name: e.target.value })
-							}
-							className="w-full px-4 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-							placeholder="my-script"
-						/>
-					</div>
-
-					<div>
-						<label
-							htmlFor="description"
-							className="block text-sm font-medium text-gray-700 mb-2"
-						>
-							Description
-						</label>
-						<input
-							name="description"
-							type="text"
-							value={formData.description}
-							onChange={(e) =>
-								setFormData({ ...formData, description: e.target.value })
-							}
-							className="w-full px-4 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-							placeholder="What does this script do?"
-						/>
-					</div>
-
-					<div>
-						<label
-							htmlFor="tags"
-							className="block text-sm font-medium text-gray-700 mb-2"
-						>
-							Tags (comma-separated)
-						</label>
-						<input
-							name="tags"
-							type="text"
-							value={formData.tags}
-							onChange={(e) =>
-								setFormData({ ...formData, tags: e.target.value })
-							}
-							className="w-full px-4 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-							placeholder="backup, automation, daily"
-						/>
-					</div>
-
-					<div>
-						<label
-							htmlFor="content"
-							className="block text-sm font-medium text-gray-700 mb-2"
-						>
-							Script Content
-						</label>
-						<textarea
-							name="content"
-							value={formData.content}
-							onChange={(e) =>
-								setFormData({ ...formData, content: e.target.value })
-							}
-							className="w-full px-4 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
-							rows={12}
-							placeholder="#!/bin/bash&#10;echo 'Hello World'"
-						/>
-					</div>
-
-					<div className="flex gap-3 pt-4">
-						<button
-							type="button"
-							onClick={handleSubmit}
-							className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-sm hover:bg-blue-700 transition-colors"
-						>
-							<Save className="w-5 h-5" />
-							{selectedScript && !isExecuting
-								? "Update Script"
-								: "Create Script"}
-						</button>
-						<button
-							type="button"
-							onClick={() => setIsModalOpen(false)}
-							className="px-4 py-2 border border-gray-300 text-gray-700 rounded-sm hover:bg-gray-50 transition-colors"
-						>
-							Cancel
-						</button>
-					</div>
-				</div>
-			</Modal>
+				onSuccess={() => loadData()}
+				isExecuting={isExecuting}
+			/>
 
 			{/* Execution Details Modal */}
-			<Modal
+			<DetailModal
+				data={selectedExecution}
 				isOpen={isExecutionModalOpen}
 				onClose={() => setIsExecutionModalOpen(false)}
-				title="Execution Details"
-			>
-				{selectedExecution && (
-					<div className="space-y-4">
-						<div className="grid grid-cols-2 gap-4">
-							<div>
-								<p className="text-sm font-medium text-gray-500">Script</p>
-								<p className="text-base font-semibold text-gray-900">
-									{selectedExecution.script_name}
-								</p>
-							</div>
-							<div>
-								<p className="text-sm font-medium text-gray-500">Status</p>
-								<p className="text-base font-semibold text-gray-900 capitalize">
-									{selectedExecution.status}
-								</p>
-							</div>
-							<div>
-								<p className="text-sm font-medium text-gray-500">Started</p>
-								<p className="text-base text-gray-900">
-									{new Date(selectedExecution.started_at).toLocaleString()}
-								</p>
-							</div>
-							<div>
-								<p className="text-sm font-medium text-gray-500">Exit Code</p>
-								<p className="text-base text-gray-900">
-									{selectedExecution.exit_code ?? "N/A"}
-								</p>
-							</div>
-						</div>
+			/>
 
-						<div>
-							<p className="text-sm font-medium text-gray-500 mb-2">Output</p>
-							<pre className="bg-gray-900 text-green-400 p-4 rounded-sm overflow-x-auto text-sm font-mono">
-								{selectedExecution.output || "(no output)"}
-							</pre>
-						</div>
-
-						{selectedExecution.error && (
-							<div>
-								<p className="text-sm font-medium text-gray-500 mb-2">Error</p>
-								<pre className="bg-red-50 text-red-900 p-4 rounded-sm overflow-x-auto text-sm font-mono border border-red-200">
-									{selectedExecution.error}
-								</pre>
-							</div>
-						)}
-					</div>
-				)}
-			</Modal>
 		</div>
 	);
 }

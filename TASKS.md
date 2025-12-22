@@ -1,3 +1,7 @@
+Fix bugs and do tasks belows then check it after done
+
+Tasks:
+
 - [x] On frontend make scripts item clickable then open new details page
   - [x] Implement live executing output
 - [x] On backend make scripts execute live response and cancellable
@@ -12,6 +16,3 @@ Bugs:
 - [x] Fix the socket not work well when click execute on web it no any action
 - [x] Fix AttributeError: 'ExecutionService' object has no attribute 'get_script'
 - [x] Check and fix my deployment with docker on firebase studio
-
-NOTE:
-Always update this after finished each tasks or bugs fixed.

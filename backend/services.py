@@ -214,16 +214,21 @@ class ExecutionService:
 
             # PS4='[DEBUG:${LINENO}] set -x
             # stdbuf -oL -eL sh deploy.sh
+            # process = await asyncio.create_subprocess_shell(
+            #     f"stdbuf -oL -eL bash -x {temp_script}",
+            #     stdout=asyncio.subprocess.PIPE,
+            #     stderr=asyncio.subprocess.PIPE,
+            #     env={
+            #         **os.environ,
+            #         "PS4": "\$ ",
+            #         # "PS4": " \n[CMD:${LINENO}] ",
+            #     },
+            # )
 
             process = await asyncio.create_subprocess_shell(
-                f"stdbuf -oL -eL sh -x {temp_script}",
+                f"bash {temp_script}",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env={
-                    **os.environ,
-                    "PS4": "\$ ",
-                    # "PS4": " \n[CMD:${LINENO}] ",
-                },
             )
 
             # Store active execution
