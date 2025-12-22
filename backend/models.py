@@ -6,9 +6,10 @@ import uuid
 
 Base = declarative_base()
 
+
 class Script(Base):
     __tablename__ = "scripts"
-    
+
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String(255), nullable=False, unique=True)
     description = Column(Text, default="")
@@ -16,10 +17,12 @@ class Script(Base):
     tags = Column(ARRAY(String), default=list)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
     # Relationship
-    executions = relationship("Execution", back_populates="script", cascade="all, delete-orphan")
-    
+    executions = relationship(
+        "Execution", back_populates="script", cascade="all, delete-orphan"
+    )
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -31,22 +34,27 @@ class Script(Base):
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
+
 class Execution(Base):
     __tablename__ = "executions"
-    
+
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    script_id = Column(String, ForeignKey("scripts.id", ondelete="CASCADE"), nullable=False)
+    script_id = Column(
+        String, ForeignKey("scripts.id", ondelete="CASCADE"), nullable=False
+    )
     script_name = Column(String(255), nullable=False)
     status = Column(String(50), default="running")  # running, completed, failed
     output = Column(Text, default="")
     error = Column(Text, default="")
+    exit_code = Column(Integer, nullable=True)
     started_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
-    exit_code = Column(Integer, nullable=True)
-    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
     # Relationship
     script = relationship("Script", back_populates="executions")
-    
+
     def to_dict(self):
         return {
             "id": self.id,
@@ -56,6 +64,8 @@ class Execution(Base):
             "output": self.output,
             "error": self.error,
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "completed_at": (
+                self.completed_at.isoformat() if self.completed_at else None
+            ),
             "exit_code": self.exit_code,
         }

@@ -169,8 +169,6 @@ async def websocket_execute(websocket: WebSocket, script_id: str):
     await websocket.accept()
 
     try:
-        # split command by lines
-        # then execute 1 by 1
         await execution_service.execute_script_ws(
             websocket, script_id, script["name"], script["content"]
         )

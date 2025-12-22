@@ -119,7 +119,7 @@ class ExecutionService:
                     "error": "",
                 }
             )
-            return execution.id
+            return execution
 
     def update_execution(
         self, execution_id: str, data: Dict[str, Any]
@@ -129,6 +129,30 @@ class ExecutionService:
             repo = ExecutionRepository(session)
             execution = repo.update(execution_id, data)
             return execution.to_dict() if execution else None
+
+    def get_running_execution(self, script_id):
+        with self.db.session_scope() as session:
+            execution = (
+                session.query(Execution)
+                .filter(
+                    Execution.script_id == script_id,
+                    Execution.status == "running",
+                )
+                .order_by(Execution.started_at.desc())
+                .first()
+            )
+
+            return execution.to_dict() if execution else None
+
+    def first_or_create(self, script_id: str, script_name: str):
+        execution = self.get_running_execution(script_id)
+
+        if execution:
+            execution_id = execution["id"]
+        else:
+            execution_id = self.create_execution(script_id, script_name)["id"]
+
+        return execution_id
 
     def get_stats(self) -> Dict[str, int]:
         """Get execution statistics"""
@@ -190,7 +214,14 @@ class ExecutionService:
                 os.remove(old_temp_script)
             del self.active_executions[script_id]
 
-        execution_id = self.create_execution(script_id, script_name)
+        # execution_id = self.create_execution(script_id, script_name)
+        execution_id = self.first_or_create(script_id, script_name)
+
+        print("================================================================")
+        print("script_id: ", script_id)
+        print("execution_id: ", execution_id)
+        print("================================================================")
+
         # await websocket.send_json(
         #     {"type": "execute", "data": execution_id, "command": script_content}
         # )
@@ -226,7 +257,7 @@ class ExecutionService:
             # )
 
             process = await asyncio.create_subprocess_shell(
-                f"bash {temp_script}",
+                f"stdbuf -oL -eL bash {temp_script}",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
@@ -252,8 +283,8 @@ class ExecutionService:
                 execution_id,
                 {
                     "status": status,
-                    "output": full_stdout,
                     "error": full_stderr,
+                    "output": full_stdout,
                     "exit_code": process.returncode,
                     "completed_at": datetime.utcnow(),
                 },

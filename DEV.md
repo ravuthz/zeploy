@@ -19,6 +19,11 @@ pip install python-dotenv
 # Run server
 uvicorn main:app --reload --port 8000
 
+uvicorn main:app --reload --port 8000 --log-level debug --no-access-log
+
+uvicorn main:app --reload --port 8000 --log-config logging_config.ini
+
+
 git init && git add . && git commit -m "Setup python, fastapi with postgresql"
 
 # psql
